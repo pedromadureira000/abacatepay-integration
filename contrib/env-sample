@@ -1,3 +1,10 @@
+# PostgreSQL Database Configuration
 DATABASE_URL="sqlite:///./app.db"
+# in production --> DATABASE_URL="postgresql://abacatepay_user:abacatepay_password@db:5432/abacatepay_db"
+
+# AbacatePay API Configuration
 ABACATE_PAY_API_KEY="your_abacate_pay_api_key_here"
 ABACATE_PAY_BASE_URL="https://api.abacatepay.com"
+
+# Webhook Configuration
+WEBHOOK_SECRET="your_webhook_secret_here"

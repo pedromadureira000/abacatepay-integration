@@ -155,3 +155,91 @@ curl -X POST "http://127.0.0.1:8000/v1/pixQrCode/simulate-payment/{pix_qr_code_i
   "metadata": {}
 }'
 ```
+
+# Webhook Integration
+
+This project includes an endpoint to receive webhook notifications from AbacatePay.
+
+## Setup
+
+1.  Add the webhook secret to your `.env` file:
+    ```.env
+    WEBHOOK_SECRET="your_webhook_secret_here"
+    ```
+    Replace `"your_webhook_secret_here"` with a strong, unique secret string.
+
+2.  Configure the webhook URL in your AbacatePay dashboard. The URL should include the secret as a query parameter.
+    Example: `https://your-api-domain.com/webhook/abacatepay?webhookSecret=your_webhook_secret_here`
+
+## Usage Example
+
+You can simulate a webhook call using `curl`.
+
+### Simulate `billing.paid` (PIX QR Code)
+
+```bash
+curl -X POST "http://127.0.0.1:8000/webhook/abacatepay?webhookSecret=your_webhook_secret_here" \
+-H "Content-Type: application/json" \
+-d '{
+  "data": {
+    "payment": {
+      "amount": 1000,
+      "fee": 80,
+      "method": "PIX"
+    },
+    "pixQrCode": {
+      "amount": 1000,
+      "id": "pix_char_mXTWdj6sABWnc4uL2Rh1r6tb",
+      "kind": "PIX",
+      "status": "PAID"
+    }
+  },
+  "devMode": false,
+  "event": "billing.paid"
+}'
+```
+
+### Simulate `billing.paid` (Billing)
+
+```bash
+curl -X POST "http://127.0.0.1:8000/webhook/abacatepay?webhookSecret=your_webhook_secret_here" \
+-H "Content-Type: application/json" \
+-d '{
+  "data": {
+    "payment": {
+      "amount": 1000,
+      "fee": 80,
+      "method": "PIX"
+    },
+    "billing": {
+      "amount": 1000,
+      "couponsUsed": [],
+      "customer": {
+        "id": "cust_4hnLDN3YfUWrwQBQKYMwL6Ar",
+        "metadata": {
+          "cellphone": "11111111111",
+          "email": "christopher@abacatepay.com",
+          "name": "Christopher Ribeiro",
+          "taxId": "12345678901"
+        }
+      },
+      "frequency": "ONE_TIME",
+      "id": "bill_QgW1BT3uzaDGR3ANKgmmmabZ",
+      "kind": [
+        "PIX"
+      ],
+      "paidAmount": 1000,
+      "products": [
+        {
+          "externalId": "123",
+          "id": "prod_RGKGsjBWsJwRn1mHyGMFJNjP",
+          "quantity": 1
+        }
+      ],
+      "status": "PAID"
+    }
+  },
+  "devMode": false,
+  "event": "billing.paid"
+}'
+```

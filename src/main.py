@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Depends
+import os
+from dotenv import load_dotenv
+from fastapi import FastAPI, Depends, Query, HTTPException, status
 from typing import Any
 
 from . import models, schemas
@@ -7,6 +9,9 @@ from .auth import get_current_user
 from .abacatepay import AbacatePayClient, get_abacate_pay_client
 
 models.Base.metadata.create_all(bind=engine)
+
+load_dotenv()
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 app = FastAPI(
     title="AbacatePay Integration API",
@@ -97,3 +102,30 @@ async def simulate_pix_qr_code_payment(
     Simulates the payment of a PIX QR Code created in development mode.
     """
     return await client.simulate_pix_qr_code_payment(pix_id, payment_data)
+
+# --- Webhook Endpoint ---
+
+@app.post("/webhook/abacatepay", tags=["AbacatePay - Webhook"], summary="Receive webhook notifications")
+async def abacatepay_webhook(
+    payload: schemas.WebhookPayload,
+    webhookSecret: str = Query(..., alias="webhookSecret")
+):
+    """
+    Receives and processes webhook notifications from AbacatePay.
+    """
+    if not WEBHOOK_SECRET or WEBHOOK_SECRET == "your_webhook_secret_here":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Webhook secret is not configured on the server."
+        )
+
+    if webhookSecret != WEBHOOK_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook secret"
+        )
+
+    print(f"Received webhook event: {payload.event}")
+    print(f"Payload: {payload.model_dump_json(indent=2)}")
+
+    return {"received": True}
