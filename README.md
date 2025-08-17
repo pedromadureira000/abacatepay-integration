@@ -1,44 +1,22 @@
-# AbacatePay Integration Project
-
-This project provides a FastAPI backend that integrates with the AbacatePay API, allowing you to manage customers and billings.
-
-## Initial setup
-
-1.  Clone the repository:
-    ```bash
-    git clone git@github.com:pedromadureira000/abacatepay-integration.git
-    cd abacatepay-integration
-    ```
-
-2.  Create and activate a virtual environment:
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    ```
-
-3.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  Set up your environment variables. If you don't have a `.env` file, create one and add the following content:
-    ```.env
-    DATABASE_URL="sqlite:///./app.db"
-    ABACATE_PAY_API_KEY="your_abacate_pay_api_key_here"
-    ABACATE_PAY_BASE_URL="https://api.abacatepay.com"
-    ```
-    **Important:** Replace `"your_abacate_pay_api_key_here"` with your actual key from AbacatePay.
-
-5.  Create a local user for API authentication:
-    ```bash
-    make create-user
-    ```
-    You will be prompted to enter a username and password.
+# Tutorial
+```bash
+git clone git@github.com:pedromadureira000/abacatepay-integration.git
+cd fight-gym
+python -m venv .venv
+# if necessary: sudo docker compose up -d
+source .venv/bin/activate && sudo systemctl start docker
+pip install -r requirements.txt
+cp contrib/env-sample .env
+psql postgres://phsw:senhasegura@localhost:5432/postgres
+postgres=# create database abacatepay_db;
+postgres=# \q
+make create-user
+```
 
 ## Run server locally
 
 ```bash
-uvicorn src.main:app --reload
+sudo uvicorn src.main:app --reload
 ```
 The API will be available at `http://127.0.0.1:8000`. You can access the interactive documentation at `http://127.0.0.1:8000/docs`.
 

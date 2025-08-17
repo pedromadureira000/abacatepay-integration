@@ -1,73 +1,237 @@
-# Production Deployment Guide
-
-This guide outlines the steps to deploy the AbacatePay Integration API in a production environment using Docker, Docker Compose, PostgreSQL, Gunicorn, and Nginx.
-
-## Prerequisites
-
--   [Docker](https://docs.docker.com/get-docker/)
--   [Docker Compose](https://docs.docker.com/compose/install/)
-
-## 1. Configure Environment Variables
-
-1.  Copy the sample environment file:
-    ```bash
-    cp contrib/env-sample .env
-    ```
-
-2.  Edit the `.env` file and fill in the required values. For a Docker Compose deployment, your `DATABASE_URL` should point to the database service name (`db`):
-
-    ```.env
-    # PostgreSQL Database Configuration
-    DATABASE_URL="postgresql://abacatepay_user:abacatepay_password@db:5432/abacatepay_db"
-
-    # AbacatePay API Configuration
-    ABACATE_PAY_API_KEY="your_production_abacate_pay_api_key"
-    ABACATE_PAY_BASE_URL="https://api.abacatepay.com"
-
-    # Webhook Configuration
-    WEBHOOK_SECRET="your_strong_production_webhook_secret"
-    ```
-    **Note:** The database credentials in `.env` must match the `POSTGRES_USER` and `POSTGRES_PASSWORD` values in `docker-compose.yml`.
-
-## 2. Build and Run the Services
-
-From the root of the project, run the following command to build the images and start the containers in detached mode:
-
-```bash
-sudo docker compose up -d --build
+# Deployment in production
+## connect ssh
+```
+chmod 400 ~/.ssh/your_key.pem
+ssh -i ~/.ssh/your_key.pem ubuntu@<ip>
 ```
 
-This will start three services:
--   `db`: The PostgreSQL database.
--   `api`: The FastAPI application served by Gunicorn.
--   `nginx`: The Nginx reverse proxy, which exposes the API on port 80.
-
-## 3. Create an API User
-
-To interact with the protected API endpoints, you need to create an initial user. Run the `make create-user` command inside the running `api` container:
-
-```bash
-docker compose exec api make create-user
+## Check system version
+```
+cat /etc/os-release
+lsb_release -a
 ```
 
-You will be prompted to enter a username and password.
-
-## 4. Verify the Deployment
-
-You can check if the API is running by sending a request to the `/check-authentication` endpoint through the Nginx proxy on port 80.
-
-```bash
-curl -u your_username:your_password http://localhost/check-authentication
+## Update system packages
+```
+sudo apt-get update && sudo apt-get -y upgrade
 ```
 
-You should receive a success message. Your API is now deployed and accessible on `http://localhost`.
-
-## Managing the Database
-
-The `docker-compose.yml` configuration automatically creates the `abacatepay_db` database. If you need to connect to it manually, you can use the following command:
-
-```bash
-docker compose exec -it db psql -U abacatepay_user -d abacatepay_db
+## Install Python 3 build tools
 ```
-You will be prompted for the password (`abacatepay_password` from your configuration).
+sudo apt install -y python3-pip python3-dev libpq-dev
 ```
+
+## Install other stuff
+```
+sudo apt install -y make nginx curl neovim unzip
+```
+
+## Confirm GCC version:
+```
+gcc --version
+```
+
+## install venv package (whatever version is the one the system is using)
+```
+sudo apt install -y python3.12-venv
+```
+
+## Install docker and postgres client
+```
+sudo apt install -y docker.io postgresql-client-common postgresql-client
+```
+
+## Configure git
+```
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+cd ~/.ssh
+ssh-keygen -t ed25519 -C "your.email@example.com"
+sudo chmod 400 ~/.ssh/id_ed25519
+sudo chmod 400 ~/.ssh/id_ed25519.pub
+```
+* Add public key in github ssh keys as Authentication key 
+link: https://github.com/settings/keys
+```
+cat ~/.ssh/id_ed25519.pub
+```
+
+## Add SSH Key to SSH Agent: Start the SSH agent if it's not already running, then add your SSH private key to it
+```
+eval `ssh-agent -s` && ssh-add ~/.ssh/id_ed25519
+```
+
+## test if it's working
+```
+ssh -T git@github.com
+```
+
+## Clone the project
+```
+cd
+git clone git@github.com:pedromadureira000/abacatepay-integration.git
+```
+
+## Run Postgres container
+-----------------------------------------
+You must run this in the same folder where the 'docker-compose.yml' file is.
+
+### install compose manually (if `docker-compose` command doesn't work)
+* To download and install the Compose CLI plugin, adding it to all users, run:
+```
+DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
+sudo mkdir -p $DOCKER_CONFIG/cli-plugins
+```
+* download correct version for your server's architecture (e.g., arm64 for EC2 t4g, x86_64 for EC2 t2)
+```
+# For arm64
+sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-aarch64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+
+# For x86_64
+# sudo curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+```
+
+* Apply executable permissions to the binary:
+```
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+```
+* test it
+```
+docker compose version
+```
+* finally
+```
+cd /home/ubuntu/abacatepay-integration
+sudo docker compose up -d
+```
+
+## Connect to default database and create the database that you will use
+```
+psql postgres://phsw:senhasegura@localhost:5432/postgres
+create database abacatepay_db;
+\q
+```
+
+## Initial project settings
+```
+cd /home/ubuntu/abacatepay-integration
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env # Assuming .env.example exists
+nvim .env # Edit your environment variables
+```
+
+## Create initial user
+```
+make create-user
+```
+
+Create systemd service for Uvicorn
+-----------------------------------------
+
+* Create the file with:
+
+```
+sudo nvim /etc/systemd/system/abacatepay.service
+```
+
+* Then copy this to that file. This will run Uvicorn with 3 workers listening on a local port.
+
+```
+[Unit]
+Description=Uvicorn instance to serve abacatepay-integration
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/abacatepay-integration
+ExecStart=/home/ubuntu/abacatepay-integration/.venv/bin/uvicorn src.main:app --host 127.0.0.1 --port 8000 --workers 3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Start and enable the Uvicorn service
+-----------------------------------------
+```
+sudo systemctl start abacatepay.service
+sudo systemctl enable abacatepay.service
+sudo systemctl status abacatepay.service
+```
+
+Check the Uvicorn service's logs 
+-----------------------------------------
+```
+sudo journalctl -u abacatepay.service -f
+```
+
+If you make changes to the `/etc/systemd/system/abacatepay.service` file, reload the daemon and restart the service:
+-----------------------------------------
+```
+sudo systemctl daemon-reload
+sudo systemctl restart abacatepay.service
+```
+
+## Configure Nginx to Proxy Pass to Uvicorn
+
+* Create the file
+
+```
+sudo nvim /etc/nginx/sites-available/abacatepay
+```
+
+* Paste the nginx configuration code, and edit the `server_name` with your server IP or domain.
+```
+server {
+        listen 80;
+        server_name your_server_ip_or_domain.com;
+
+        location / {
+                include proxy_params;
+                proxy_pass http://127.0.0.1:8000;
+        }
+}
+```
+
+Enable the file by linking it to the sites-enabled directory:
+-----------------------------------------
+
+```
+sudo ln -s /etc/nginx/sites-available/abacatepay /etc/nginx/sites-enabled
+```
+
+Test for syntax errors
+-----------------------------------------
+```
+sudo nginx -t
+```
+
+Restart nginx
+-----------------------------------------
+```
+sudo systemctl restart nginx
+```
+
+If Nginx fails to start, check its status and logs for errors.
+-----------------------------------------
+```
+sudo systemctl status nginx
+sudo journalctl -u nginx
+```
+
+Install SSL and set domain
+-----------------------------------------
+*OBS: Don't use UFW on cloud providers like AWS unless you configure it to allow SSH (port 22). You might lose SSH access.*
+
+For a detailed guide on securing Nginx with Let's Encrypt, follow this tutorial:
+https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-22-04
+
+After setting up SSL, your Nginx config file will be modified by Certbot. Remember to restart the services if you make manual changes.
+`
+sudo nvim /etc/nginx/sites-available/abacatepay
+sudo systemctl restart nginx
+sudo systemctl restart abacatepay.service
+`
