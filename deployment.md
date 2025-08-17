@@ -187,7 +187,7 @@ sudo nvim /etc/nginx/sites-available/abacatepay
 ```
 server {
         listen 80;
-        server_name your_server_ip_or_domain.com;
+        server_name your_server_ip_or_domain;
 
         location / {
                 include proxy_params;
